@@ -1055,7 +1055,7 @@ class Speedtest(object):
         headers = {}
         if gzip:
             headers['Accept-Encoding'] = 'gzip'
-        request = build_request('://www.speedtest.net/speedtest-config.php',
+        request = build_request('http://127.0.0.1/speedtest-config.xml',
                                 headers=headers, secure=self._secure)
         uh, e = catch_request(request, opener=self._opener)
         if e:
@@ -1185,11 +1185,8 @@ class Speedtest(object):
                     )
 
         urls = [
-            '://www.speedtest.net/speedtest-servers-static.php',
-            'http://c.speedtest.net/speedtest-servers-static.php',
-            '://www.speedtest.net/speedtest-servers.php',
-            'http://c.speedtest.net/speedtest-servers.php',
-        ]
+            'http://locahost/speedtest-servers-custom.xml'
+                    ]
 
         headers = {}
         if gzip:
