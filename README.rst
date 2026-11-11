@@ -36,7 +36,7 @@ From this fork
 
 ::
 
-    pip install git+https://github.com/MrTiptop/speedtest-cli@python-3.10-plus
+    pip install git+https://github.com/MrTiptop/speedtest-cli
 
 The ``speedtest-cli`` package on PyPI is the archived upstream 2.1.3, without
 the fixes above.
@@ -46,7 +46,7 @@ Github
 
 ::
 
-    pip install git+https://github.com/MrTiptop/speedtest-cli.git@python-3.10-plus
+    pip install git+https://github.com/MrTiptop/speedtest-cli.git
 
 or
 
@@ -61,14 +61,14 @@ Just download (Like the way it used to be)
 
 ::
 
-    wget -O speedtest-cli https://raw.githubusercontent.com/MrTiptop/speedtest-cli/python-3.10-plus/speedtest.py
+    wget -O speedtest-cli https://raw.githubusercontent.com/MrTiptop/speedtest-cli/master/speedtest.py
     chmod +x speedtest-cli
 
 or
 
 ::
 
-    curl -Lo speedtest-cli https://raw.githubusercontent.com/MrTiptop/speedtest-cli/python-3.10-plus/speedtest.py
+    curl -Lo speedtest-cli https://raw.githubusercontent.com/MrTiptop/speedtest-cli/master/speedtest.py
     chmod +x speedtest-cli
 
 Usage
