@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 # Fork maintained by MrTiptop: https://github.com/MrTiptop/speedtest-cli
 # Changed from sivel/speedtest-cli 2.1.3: server discovery via the
-# speedtest.net JSON server directory and --server-search (see README.rst).
+# speedtest.net JSON server directory, --server-search, Python 3.10+ only
+# (see README.rst).
 #
 # Copyright 2012 Matt Martz
 # All Rights Reserved.
@@ -19,6 +20,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import builtins
 import csv
 import datetime
 import errno
@@ -32,6 +34,7 @@ import sys
 import threading
 import timeit
 import xml.parsers.expat
+from io import FileIO, TextIOWrapper
 
 try:
     import gzip
@@ -40,7 +43,7 @@ except ImportError:
     gzip = None
     GZIP_BASE = object
 
-__version__ = '2.1.5'
+__version__ = '2.2.0'
 
 # The JSON directory caps its nearest-server answer at 20 whatever is asked.
 JSON_SERVER_LIMIT = 100
@@ -167,119 +170,49 @@ except ImportError:
     except ImportError:
         from io import StringIO, BytesIO
 
+
+class _Py3Utf8Output(TextIOWrapper):
+    """UTF-8 encoded wrapper around stdout for py3, to override
+    ASCII stdout
+    """
+    def __init__(self, f, **kwargs):
+        # The process still owns stdout/stderr, so never close their fds here.
+        buf = FileIO(f.fileno(), 'w', closefd=False)
+        super(_Py3Utf8Output, self).__init__(
+            buf,
+            encoding='utf8',
+            errors='strict'
+        )
+
+    def write(self, s):
+        super(_Py3Utf8Output, self).write(s)
+        self.flush()
+
+
+_py3_print = getattr(builtins, 'print')
 try:
-    import __builtin__
-except ImportError:
-    import builtins
-    from io import TextIOWrapper, FileIO
+    _py3_utf8_stdout = _Py3Utf8Output(sys.stdout)
+    _py3_utf8_stderr = _Py3Utf8Output(sys.stderr)
+except OSError:
+    # sys.stdout/sys.stderr is not a compatible stdout/stderr object
+    # just use it and hope things go ok
+    _py3_utf8_stdout = sys.stdout
+    _py3_utf8_stderr = sys.stderr
 
-    class _Py3Utf8Output(TextIOWrapper):
-        """UTF-8 encoded wrapper around stdout for py3, to override
-        ASCII stdout
-        """
-        def __init__(self, f, **kwargs):
-            buf = FileIO(f.fileno(), 'w')
-            super(_Py3Utf8Output, self).__init__(
-                buf,
-                encoding='utf8',
-                errors='strict'
-            )
 
-        def write(self, s):
-            super(_Py3Utf8Output, self).write(s)
-            self.flush()
+def to_utf8(v):
+    """No-op encode to utf-8 for py3"""
+    return v
 
-    _py3_print = getattr(builtins, 'print')
-    try:
-        _py3_utf8_stdout = _Py3Utf8Output(sys.stdout)
-        _py3_utf8_stderr = _Py3Utf8Output(sys.stderr)
-    except OSError:
-        # sys.stdout/sys.stderr is not a compatible stdout/stderr object
-        # just use it and hope things go ok
-        _py3_utf8_stdout = sys.stdout
-        _py3_utf8_stderr = sys.stderr
 
-    def to_utf8(v):
-        """No-op encode to utf-8 for py3"""
-        return v
+def print_(*args, **kwargs):
+    """Wrapper function for py3 to print, with a utf-8 encoded stdout"""
+    if kwargs.get('file') == sys.stderr:
+        kwargs['file'] = _py3_utf8_stderr
+    else:
+        kwargs['file'] = kwargs.get('file', _py3_utf8_stdout)
+    _py3_print(*args, **kwargs)
 
-    def print_(*args, **kwargs):
-        """Wrapper function for py3 to print, with a utf-8 encoded stdout"""
-        if kwargs.get('file') == sys.stderr:
-            kwargs['file'] = _py3_utf8_stderr
-        else:
-            kwargs['file'] = kwargs.get('file', _py3_utf8_stdout)
-        _py3_print(*args, **kwargs)
-else:
-    del __builtin__
-
-    def to_utf8(v):
-        """Encode value to utf-8 if possible for py2"""
-        try:
-            return v.encode('utf8', 'strict')
-        except AttributeError:
-            return v
-
-    def print_(*args, **kwargs):
-        """The new-style print function for Python 2.4 and 2.5.
-
-        Taken from https://pypi.python.org/pypi/six/
-
-        Modified to set encoding to UTF-8 always, and to flush after write
-        """
-        fp = kwargs.pop("file", sys.stdout)
-        if fp is None:
-            return
-
-        def write(data):
-            if not isinstance(data, basestring):
-                data = str(data)
-            # If the file has an encoding, encode unicode with it.
-            encoding = 'utf8'  # Always trust UTF-8 for output
-            if (isinstance(fp, file) and
-                    isinstance(data, unicode) and
-                    encoding is not None):
-                errors = getattr(fp, "errors", None)
-                if errors is None:
-                    errors = "strict"
-                data = data.encode(encoding, errors)
-            fp.write(data)
-            fp.flush()
-        want_unicode = False
-        sep = kwargs.pop("sep", None)
-        if sep is not None:
-            if isinstance(sep, unicode):
-                want_unicode = True
-            elif not isinstance(sep, str):
-                raise TypeError("sep must be None or a string")
-        end = kwargs.pop("end", None)
-        if end is not None:
-            if isinstance(end, unicode):
-                want_unicode = True
-            elif not isinstance(end, str):
-                raise TypeError("end must be None or a string")
-        if kwargs:
-            raise TypeError("invalid keyword arguments to print()")
-        if not want_unicode:
-            for arg in args:
-                if isinstance(arg, unicode):
-                    want_unicode = True
-                    break
-        if want_unicode:
-            newline = unicode("\n")
-            space = unicode(" ")
-        else:
-            newline = "\n"
-            space = " "
-        if sep is None:
-            sep = space
-        if end is None:
-            end = newline
-        for i, arg in enumerate(args):
-            if i:
-                write(sep)
-            write(arg)
-        write(end)
 
 # Exception "constants" to support Python 2 through Python 3
 try:
@@ -1820,7 +1753,7 @@ def parse_args():
         'speedtest.net.\n'
         '------------------------------------------------------------'
         '--------------\n'
-        'https://github.com/sivel/speedtest-cli')
+        'https://github.com/MrTiptop/speedtest-cli')
 
     parser = ArgParser(description=description)
     # Give optparse.OptionParser an `add_argument` method for
@@ -2108,6 +2041,9 @@ def shell():
 
 
 def main():
+    if sys.version_info[:2] < (3, 10):
+        sys.exit('speedtest-cli %s requires Python 3.10 or newer' %
+                 __version__)
     try:
         shell()
     except KeyboardInterrupt:
