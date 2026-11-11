@@ -26,30 +26,11 @@ from upstream 2.1.3:
 Versions
 --------
 
-The current release of this fork is **2.2.0**. It needs Python 3.10 or newer
-and is tested in CI on every supported Python:
+speedtest-cli works with Python 3.10-3.15
 
-=======  ========
-Python   Status
-=======  ========
-3.10     tested
-3.11     tested
-3.12     tested
-3.13     tested
-3.14     tested
-3.15     tested
-=======  ========
-
-Changes in this fork:
-
-- **2.2.0**: Python 3.10 or newer only (Python 2 and 3.0-3.9 removed);
-  GitHub Actions CI for 3.10-3.15 and flake8; no ``ResourceWarning`` from the
-  stdout/stderr wrapper.
-- **2.1.5**: server discovery through the speedtest.net JSON directory;
-  ``--server-search``; real speedtest.net config URL restored; no
-  ``utcnow()`` deprecation warning on Python 3.12+.
-- **2.1.3**: last upstream release of `sivel/speedtest-cli
-  <https://github.com/sivel/speedtest-cli>`_ (April 2021).
+.. image:: https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13%20%7C%203.14%20%7C%203.15-blue.svg
+        :target: https://github.com/MrTiptop/speedtest-cli/actions/workflows/ci.yml
+        :alt: Versions
 
 Installation
 ------------
