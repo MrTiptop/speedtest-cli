@@ -4,6 +4,24 @@ speedtest-cli
 Command line interface for testing internet bandwidth using
 speedtest.net
 
+This fork (MrTiptop/speedtest-cli) continues `sivel/speedtest-cli
+<https://github.com/sivel/speedtest-cli>`_, which is archived. Changes
+from upstream 2.1.3:
+
+- Servers come from the speedtest.net JSON server directory
+  (``/api/js/servers``). The legacy XML lists sit behind a shared cache that
+  can return a list built for another client's location, so ``--server``
+  failed with "No matched servers". They are now only a fallback for server
+  IDs the directory did not return.
+- ``--server-search TEXT`` adds servers whose name or sponsor matches, for
+  servers beyond the nearest 20 the directory returns, e.g.
+  ``--server 28818 --server-search Pfalzkom``.
+- No ``utcnow()`` deprecation warning on Python 3.12+.
+
+Install from this fork::
+
+    pip install git+https://github.com/MrTiptop/speedtest-cli@fix/server-discovery
+
 .. image:: https://img.shields.io/pypi/v/speedtest-cli.svg
         :target: https://pypi.python.org/pypi/speedtest-cli/
         :alt: Latest Version

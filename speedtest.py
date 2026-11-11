@@ -1,5 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# Fork maintained by MrTiptop: https://github.com/MrTiptop/speedtest-cli
+# Changed from sivel/speedtest-cli 2.1.3: server discovery via the
+# speedtest.net JSON server directory and --server-search (see README.rst).
+#
 # Copyright 2012 Matt Martz
 # All Rights Reserved.
 #
@@ -36,7 +40,10 @@ except ImportError:
     gzip = None
     GZIP_BASE = object
 
-__version__ = '2.1.4b1'
+__version__ = '2.1.5'
+
+# The JSON directory caps its nearest-server answer at 20 whatever is asked.
+JSON_SERVER_LIMIT = 100
 
 
 class FakeShutdownEvent(object):
@@ -118,6 +125,11 @@ try:
     from urlparse import urlparse
 except ImportError:
     from urllib.parse import urlparse
+
+try:
+    from urllib import quote
+except ImportError:
+    from urllib.parse import quote
 
 try:
     from urlparse import parse_qs
@@ -672,6 +684,18 @@ def distance(origin, destination):
     return d
 
 
+def utc_now():
+    """Naive UTC datetime; utcnow() warns from Python 3.12 and the warning
+    would land in output that callers parse
+    """
+    try:
+        return datetime.datetime.now(datetime.timezone.utc).replace(
+            tzinfo=None
+        )
+    except AttributeError:
+        return datetime.datetime.utcnow()
+
+
 def build_user_agent():
     """Build a Mozilla/5.0 compatible User-Agent string"""
 
@@ -957,7 +981,7 @@ class SpeedtestResults(object):
         self.client = client or {}
 
         self._share = None
-        self.timestamp = '%sZ' % datetime.datetime.utcnow().isoformat()
+        self.timestamp = '%sZ' % utc_now().isoformat()
         self.bytes_received = 0
         self.bytes_sent = 0
 
@@ -1129,7 +1153,7 @@ class Speedtest(object):
         headers = {}
         if gzip:
             headers['Accept-Encoding'] = 'gzip'
-        request = build_request('http://127.0.0.1/speedtest-config.xml',
+        request = build_request('://www.speedtest.net/speedtest-config.php',
                                 headers=headers, secure=self._secure)
         uh, e = catch_request(request, opener=self._opener)
         if e:
@@ -1237,15 +1261,21 @@ class Speedtest(object):
 
         return self.config
 
-    def get_servers(self, servers=None, exclude=None):
+    def get_servers(self, servers=None, exclude=None, search=None):
         """Retrieve a the list of speedtest.net servers, optionally filtered
-        to servers matching those specified in the ``servers`` argument
+        to servers matching those specified in the ``servers`` argument.
+
+        ``search`` adds servers found by name in the speedtest.net server
+        directory, for servers outside the nearest few.
         """
         if servers is None:
             servers = []
 
         if exclude is None:
             exclude = []
+
+        if search is None:
+            search = []
 
         self.servers.clear()
 
@@ -1258,9 +1288,109 @@ class Speedtest(object):
                         '%s is an invalid server type, must be int' % s
                     )
 
+        found = set()
+        # The legacy XML lists sit behind a shared cache that can answer with
+        # a list built for another client's location, so the JSON directory
+        # comes first and the XML lists only fill in missing server IDs.
+        self._get_servers_json(servers, exclude, found)
+        for term in search:
+            self._get_servers_json(servers, exclude, found, search=term)
+        if not found or (servers and not set(servers) <= found):
+            self._get_servers_xml(servers, exclude, found)
+
+        if (servers or exclude or search) and not self.servers:
+            raise NoMatchedServers()
+
+        return self.servers
+
+    def _add_server(self, attrib, servers, exclude, found):
+        server_id = int(attrib.get('id'))
+        if servers and server_id not in servers:
+            return
+        if (server_id in self.config['ignore_servers'] or
+                server_id in exclude or server_id in found):
+            return
+
+        try:
+            d = distance(self.lat_lon,
+                         (float(attrib.get('lat')),
+                          float(attrib.get('lon'))))
+        except Exception:
+            return
+
+        attrib['d'] = d
+        found.add(server_id)
+        try:
+            self.servers[d].append(attrib)
+        except KeyError:
+            self.servers[d] = [attrib]
+
+    def _get_servers_json(self, servers, exclude, found, search=None):
+        """Add servers from the speedtest.net JSON server directory: the
+        nearest servers, or those whose name matches ``search``
+        """
+        if json is None:
+            return
+
+        url = '://www.speedtest.net/api/js/servers?engine=js&limit=%d' % (
+            JSON_SERVER_LIMIT
+        )
+        if search:
+            url += '&search=%s' % quote(search)
+        if self._secure:
+            url += '&https_functional=true'
+
+        headers = {}
+        if gzip:
+            headers['Accept-Encoding'] = 'gzip'
+
+        request = build_request(url, headers=headers, secure=self._secure)
+        uh, e = catch_request(request, opener=self._opener)
+        if e:
+            printer('Server directory request failed: %s' % e, debug=True)
+            return
+
+        stream = get_response_stream(uh)
+        data_list = []
+        while 1:
+            try:
+                data_list.append(stream.read(1024))
+            except (OSError, EOFError):
+                return
+            if len(data_list[-1]) == 0:
+                break
+        stream.close()
+        uh.close()
+
+        if int(uh.code) != 200:
+            return
+
+        try:
+            entries = json.loads(''.encode().join(data_list).decode('utf-8'))
+        except ValueError:
+            return
+
+        printer('Servers JSON:\n%r' % entries, debug=True)
+
+        for entry in entries:
+            try:
+                attrib = dict(
+                    (key, '%s' % entry[key])
+                    for key in ('url', 'lat', 'lon', 'name', 'country', 'cc',
+                                'sponsor', 'id', 'host')
+                )
+            except (KeyError, TypeError):
+                continue
+            self._add_server(attrib, servers, exclude, found)
+
+    def _get_servers_xml(self, servers, exclude, found):
+        """Add servers from the legacy speedtest.net XML server lists"""
         urls = [
-            'http://locahost/speedtest-servers-custom.xml'
-                    ]
+            '://www.speedtest.net/speedtest-servers-static.php',
+            'http://c.speedtest.net/speedtest-servers-static.php',
+            '://www.speedtest.net/speedtest-servers.php',
+            'http://c.speedtest.net/speedtest-servers.php',
+        ]
 
         headers = {}
         if gzip:
@@ -1328,37 +1458,16 @@ class Speedtest(object):
                         attrib = server.attrib
                     except AttributeError:
                         attrib = dict(list(server.attributes.items()))
-
-                    if servers and int(attrib.get('id')) not in servers:
-                        continue
-
-                    if (int(attrib.get('id')) in self.config['ignore_servers']
-                            or int(attrib.get('id')) in exclude):
-                        continue
-
-                    try:
-                        d = distance(self.lat_lon,
-                                     (float(attrib.get('lat')),
-                                      float(attrib.get('lon'))))
-                    except Exception:
-                        continue
-
-                    attrib['d'] = d
-
-                    try:
-                        self.servers[d].append(attrib)
-                    except KeyError:
-                        self.servers[d] = [attrib]
+                    self._add_server(attrib, servers, exclude, found)
 
                 break
 
             except ServersRetrievalError:
                 continue
 
-        if (servers or exclude) and not self.servers:
-            raise NoMatchedServers()
-
-        return self.servers
+        if errors and not found:
+            printer('Legacy server lists failed: %s' % ', '.join(errors),
+                    debug=True)
 
     def set_mini_server(self, server):
         """Instead of querying for a list of servers, set a link to a
@@ -1763,6 +1872,11 @@ def parse_args():
     parser.add_argument('--exclude', type=PARSER_TYPE_INT, action='append',
                         help='Exclude a server from selection. Can be '
                              'supplied multiple times')
+    parser.add_argument('--server-search', dest='server_search',
+                        action='append',
+                        help='Also consider servers whose name or sponsor '
+                             'matches this text, for servers beyond the '
+                             'nearest 20. Can be supplied multiple times')
     parser.add_argument('--mini', help='URL of the Speedtest Mini server')
     parser.add_argument('--source', help='Source IP address to bind to')
     parser.add_argument('--timeout', default=10, type=PARSER_TYPE_FLOAT,
@@ -1890,7 +2004,7 @@ def shell():
 
     if args.list:
         try:
-            speedtest.get_servers()
+            speedtest.get_servers(search=args.server_search)
         except (ServersRetrievalError,) + HTTP_ERRORS:
             printer('Cannot retrieve speedtest server list', error=True)
             raise SpeedtestCLIError(get_exception())
@@ -1913,11 +2027,13 @@ def shell():
     if not args.mini:
         printer('Retrieving speedtest.net server list...', quiet)
         try:
-            speedtest.get_servers(servers=args.server, exclude=args.exclude)
+            speedtest.get_servers(servers=args.server, exclude=args.exclude,
+                                  search=args.server_search)
         except NoMatchedServers:
             raise SpeedtestCLIError(
                 'No matched servers: %s' %
-                ', '.join('%s' % s for s in args.server)
+                ', '.join('%s' % s for s in
+                          (args.server or args.server_search or []))
             )
         except (ServersRetrievalError,) + HTTP_ERRORS:
             printer('Cannot retrieve speedtest server list', error=True)
