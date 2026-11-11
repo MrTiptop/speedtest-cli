@@ -26,7 +26,30 @@ from upstream 2.1.3:
 Versions
 --------
 
-speedtest-cli works with Python 3.10 and newer, and is tested on 3.10-3.15.
+The current release of this fork is **2.2.0**. It needs Python 3.10 or newer
+and is tested in CI on every supported Python:
+
+=======  ========
+Python   Status
+=======  ========
+3.10     tested
+3.11     tested
+3.12     tested
+3.13     tested
+3.14     tested
+3.15     tested
+=======  ========
+
+Changes in this fork:
+
+- **2.2.0**: Python 3.10 or newer only (Python 2 and 3.0-3.9 removed);
+  GitHub Actions CI for 3.10-3.15 and flake8; no ``ResourceWarning`` from the
+  stdout/stderr wrapper.
+- **2.1.5**: server discovery through the speedtest.net JSON directory;
+  ``--server-search``; real speedtest.net config URL restored; no
+  ``utcnow()`` deprecation warning on Python 3.12+.
+- **2.1.3**: last upstream release of `sivel/speedtest-cli
+  <https://github.com/sivel/speedtest-cli>`_ (April 2021).
 
 Installation
 ------------
@@ -81,15 +104,15 @@ Usage
                          [--share] [--simple] [--csv]
                          [--csv-delimiter CSV_DELIMITER] [--csv-header] [--json]
                          [--list] [--server SERVER] [--exclude EXCLUDE]
-                         [--server-search SERVER_SEARCH]
-                         [--mini MINI] [--source SOURCE] [--timeout TIMEOUT]
-                         [--secure] [--no-pre-allocate] [--version]
+                         [--server-search SERVER_SEARCH] [--mini MINI]
+                         [--source SOURCE] [--timeout TIMEOUT] [--secure]
+                         [--no-pre-allocate] [--version]
 
     Command line interface for testing internet bandwidth using speedtest.net.
     --------------------------------------------------------------------------
     https://github.com/MrTiptop/speedtest-cli
 
-    optional arguments:
+    options:
       -h, --help            show this help message and exit
       --no-download         Do not perform download test
       --no-upload           Do not perform upload test
@@ -131,7 +154,6 @@ Usage
                             support systems with insufficient memory, use this
                             option to avoid a MemoryError
       --version             Show the version number and exit
-
 
 Python API
 ----------
