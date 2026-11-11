@@ -4,47 +4,49 @@ speedtest-cli
 Command line interface for testing internet bandwidth using
 speedtest.net
 
-.. image:: https://img.shields.io/pypi/v/speedtest-cli.svg
-        :target: https://pypi.python.org/pypi/speedtest-cli/
-        :alt: Latest Version
-.. image:: https://img.shields.io/travis/sivel/speedtest-cli.svg
-        :target: https://pypi.python.org/pypi/speedtest-cli/
-        :alt: Travis
-.. image:: https://img.shields.io/pypi/l/speedtest-cli.svg
-        :target: https://pypi.python.org/pypi/speedtest-cli/
-        :alt: License
+This fork (MrTiptop/speedtest-cli) continues `sivel/speedtest-cli
+<https://github.com/sivel/speedtest-cli>`_, which is archived. Changes
+from upstream 2.1.3:
+
+- Servers come from the speedtest.net JSON server directory
+  (``/api/js/servers``). The legacy XML lists sit behind a shared cache that
+  can return a list built for another client's location, so ``--server``
+  failed with "No matched servers". They are now only a fallback for server
+  IDs the directory did not return.
+- ``--server-search TEXT`` adds servers whose name or sponsor matches, for
+  servers beyond the nearest 20 the directory returns, e.g.
+  ``--server 28818 --server-search Pfalzkom``.
+- No ``utcnow()`` deprecation warning on Python 3.12+.
+- Python 3.10 or newer only; Python 2 and 3.0-3.9 support is removed.
+
+.. image:: https://github.com/MrTiptop/speedtest-cli/actions/workflows/ci.yml/badge.svg
+        :target: https://github.com/MrTiptop/speedtest-cli/actions/workflows/ci.yml
+        :alt: CI
 
 Versions
 --------
 
-speedtest-cli works with Python 2.4-3.7
-
-.. image:: https://img.shields.io/pypi/pyversions/speedtest-cli.svg
-        :target: https://pypi.python.org/pypi/speedtest-cli/
-        :alt: Versions
+speedtest-cli works with Python 3.10 and newer, and is tested on 3.10-3.15.
 
 Installation
 ------------
 
-pip / easy\_install
-~~~~~~~~~~~~~~~~~~~
+From this fork
+~~~~~~~~~~~~~~
 
 ::
 
-    pip install speedtest-cli
+    pip install git+https://github.com/MrTiptop/speedtest-cli
 
-or
-
-::
-
-    easy_install speedtest-cli
+The ``speedtest-cli`` package on PyPI is the archived upstream 2.1.3, without
+the fixes above.
 
 Github
 ~~~~~~
 
 ::
 
-    pip install git+https://github.com/sivel/speedtest-cli.git
+    pip install git+https://github.com/MrTiptop/speedtest-cli.git
 
 or
 
@@ -59,14 +61,14 @@ Just download (Like the way it used to be)
 
 ::
 
-    wget -O speedtest-cli https://raw.githubusercontent.com/sivel/speedtest-cli/master/speedtest.py
+    wget -O speedtest-cli https://raw.githubusercontent.com/MrTiptop/speedtest-cli/master/speedtest.py
     chmod +x speedtest-cli
 
 or
 
 ::
 
-    curl -Lo speedtest-cli https://raw.githubusercontent.com/sivel/speedtest-cli/master/speedtest.py
+    curl -Lo speedtest-cli https://raw.githubusercontent.com/MrTiptop/speedtest-cli/master/speedtest.py
     chmod +x speedtest-cli
 
 Usage
@@ -79,12 +81,13 @@ Usage
                          [--share] [--simple] [--csv]
                          [--csv-delimiter CSV_DELIMITER] [--csv-header] [--json]
                          [--list] [--server SERVER] [--exclude EXCLUDE]
+                         [--server-search SERVER_SEARCH]
                          [--mini MINI] [--source SOURCE] [--timeout TIMEOUT]
                          [--secure] [--no-pre-allocate] [--version]
 
     Command line interface for testing internet bandwidth using speedtest.net.
     --------------------------------------------------------------------------
-    https://github.com/sivel/speedtest-cli
+    https://github.com/MrTiptop/speedtest-cli
 
     optional arguments:
       -h, --help            show this help message and exit
@@ -114,6 +117,10 @@ Usage
                             multiple times
       --exclude EXCLUDE     Exclude a server from selection. Can be supplied
                             multiple times
+      --server-search SERVER_SEARCH
+                            Also consider servers whose name or sponsor matches
+                            this text, for servers beyond the nearest 20. Can be
+                            supplied multiple times
       --mini MINI           URL of the Speedtest Mini server
       --source SOURCE       Source IP address to bind to
       --timeout TIMEOUT     HTTP timeout in seconds. Default 10
